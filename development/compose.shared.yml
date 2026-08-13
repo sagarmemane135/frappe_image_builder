@@ -1,0 +1,35 @@
+services:
+  db:
+    image: mariadb:11.8
+    container_name: dev-mariadb
+    networks:
+      - frappe-dev-network
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+    environment:
+      MYSQL_ROOT_PASSWORD: admin
+      MARIADB_ROOT_PASSWORD: admin
+    volumes:
+      - dev-db-data:/var/lib/mysql
+
+  redis-cache:
+    image: redis:6.2-alpine
+    container_name: dev-redis-cache
+    networks:
+      - frappe-dev-network
+
+  redis-queue:
+    image: redis:6.2-alpine
+    container_name: dev-redis-queue
+    networks:
+      - frappe-dev-network
+
+volumes:
+  dev-db-data:
+
+networks:
+  frappe-dev-network:
+    name: frappe-dev-network
+    driver: bridge

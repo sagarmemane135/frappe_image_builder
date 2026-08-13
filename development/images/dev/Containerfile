@@ -1,0 +1,92 @@
+# Development Containerfile for VS Code Dev Containers
+FROM python:3.14.2-slim-bookworm
+
+ARG NODE_VERSION=24.13.0
+ENV NVM_DIR=/home/frappe/.nvm
+ENV PATH=${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}
+
+# Create frappe user with passwordless sudo for VS Code Remote Containers
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    curl \
+    git \
+    vim \
+    sudo \
+    procps \
+    net-tools \
+    gettext-base \
+    file \
+    restic \
+    gpg \
+    mariadb-client \
+    postgresql-client \
+    wait-for-it \
+    jq \
+    redis-server \
+    redis-tools \
+    media-types \
+    build-essential \
+    gcc \
+    pkg-config \
+    libffi-dev \
+    libssl-dev \
+    libpq-dev \
+    libmariadb-dev \
+    && useradd -ms /bin/bash frappe \
+    && echo "frappe ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/frappe \
+    && chmod 0440 /etc/sudoers.d/frappe \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js via NVM & global JS tooling
+USER frappe
+RUN mkdir -p ${NVM_DIR} \
+    && (curl -fsSL --connect-timeout 15 --retry 5 --retry-delay 3 https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh || curl -fsSL --connect-timeout 15 --retry 5 --retry-delay 3 https://cdn.jsdelivr.net/gh/nvm-sh/nvm@v0.40.1/install.sh) > /tmp/nvm-install.sh \
+    && bash /tmp/nvm-install.sh \
+    && rm -f /tmp/nvm-install.sh \
+    && . ${NVM_DIR}/nvm.sh \
+    && (nvm install ${NODE_VERSION} || nvm install node) \
+    && (nvm use v${NODE_VERSION} 2>/dev/null || nvm use node) \
+    && npm install -g yarn \
+    && corepack enable pnpm \
+    && nvm alias default ${NODE_VERSION} 2>/dev/null || true \
+    && rm -rf ${NVM_DIR}/.cache
+
+# Install frappe-bench globally
+USER root
+RUN pip3 install frappe-bench
+
+# Initialize frappe-bench with Frappe Framework v16.17.5
+USER frappe
+WORKDIR /home/frappe
+
+ARG APPS_FILE=apps.base.json
+COPY --chown=frappe:frappe ${APPS_FILE} /tmp/apps.dev.json
+
+ARG FRAPPE_BRANCH=v16.17.5
+ARG FRAPPE_PATH=https://github.com/frappe/frappe
+RUN bench init \
+    --apps_path=/tmp/apps.dev.json \
+    --frappe-branch=${FRAPPE_BRANCH} \
+    --frappe-path=${FRAPPE_PATH} \
+    --no-procfile \
+    --no-backups \
+    --skip-redis-config-generation \
+    --verbose \
+    /home/frappe/frappe-bench && \
+    cd /home/frappe/frappe-bench && \
+    bench setup procfile && \
+    sed -i '/redis_/d' Procfile && \
+    bench set-config -g db_host db && \
+    bench set-config -g redis_cache redis://redis-cache:6379 && \
+    bench set-config -g redis_queue redis://redis-queue:6379 && \
+    bench set-config -g redis_socketio redis://redis-queue:6379 && \
+    bench build && \
+    echo "source /home/frappe/frappe-bench/env/bin/activate" >> /home/frappe/.bashrc
+
+ENV PATH="/home/frappe/frappe-bench/env/bin:${PATH}"
+
+WORKDIR /home/frappe/frappe-bench
+
+# Expose bench development web server and websocket ports
+EXPOSE 8000 9000
+
+CMD ["sleep", "infinity"]

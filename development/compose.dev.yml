@@ -1,0 +1,28 @@
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: images/dev/Containerfile
+      args:
+        APPS_FILE: ${APPS_FILE:-apps.base.json}
+        FRAPPE_BRANCH: ${FRAPPE_BRANCH:-v16.30.0}
+        FRAPPE_PATH: ${FRAPPE_PATH:-https://github.com/frappe/frappe}
+    image: frappe-dev:latest
+    command: sleep infinity
+    environment:
+      DB_HOST: dev-mariadb
+      DB_PORT: "3306"
+      REDIS_CACHE: redis://dev-redis-cache:6379
+      REDIS_QUEUE: redis://dev-redis-queue:6379
+    volumes:
+      - frappe-bench:/home/frappe/frappe-bench
+    networks:
+      - frappe-dev-network
+
+volumes:
+  frappe-bench:
+
+networks:
+  frappe-dev-network:
+    name: frappe-dev-network
+    external: true

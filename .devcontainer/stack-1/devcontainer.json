@@ -1,0 +1,28 @@
+{
+  "name": "Stack 1",
+  "initializeCommand": "docker compose -f development/compose.shared.yml up -d",
+  "dockerComposeFile": [
+    "../../development/compose.dev.yml",
+    "docker-compose.override.yml"
+  ],
+  "service": "devcontainer",
+  "workspaceFolder": "/home/frappe/frappe-bench",
+  "remoteUser": "frappe",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/home/frappe/frappe-bench/env/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "eamodio.gitlens",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-mysql"
+      ]
+    }
+  }
+}

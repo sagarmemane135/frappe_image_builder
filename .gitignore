@@ -1,0 +1,32 @@
+# Environment Variables & Secret App Credentials
+.env
+*.env
+!.env.example
+apps.custom.json
+
+# Ignore active .env in development & deployment folders
+development/.env
+deployment/.env
+deployment/apps.custom.json
+
+# Docker & Bench Mounted Volumes
+sites
+logs
+
+# IDEs
+.idea
+.vscode/**
+!.vscode/extensions.json
+*.code-workspace
+
+# Python
+*.pyc
+__pycache__
+venv
+
+# NodeJS
+node_modules
+
+# VitePress
+**/.vitepress/dist
+**/.vitepress/cache

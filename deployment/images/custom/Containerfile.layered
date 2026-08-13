@@ -1,0 +1,59 @@
+# Fast Layered Containerfile using apps.custom.json secret
+# Inherits directly from pre-built Base Image (no bench directory duplication)
+
+ARG BASE_IMAGE=custom-base:v16
+FROM ${BASE_IMAGE}
+
+USER root
+# Ensure git is installed for cloning custom repositories
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+
+# Mount apps.custom.json secret and install custom applications dynamically
+RUN --mount=type=secret,id=apps_json,target=/opt/frappe/apps.json,uid=1000,gid=1000 \
+    python3 - <<'EOF'
+import json, os, subprocess
+
+apps_file = "/opt/frappe/apps.json"
+if os.path.exists(apps_file) and os.path.getsize(apps_file) > 0:
+    with open(apps_file) as f:
+        apps = json.load(f)
+    for app in apps:
+        url = app.get("url")
+        branch = app.get("branch", "main")
+        if not url:
+            continue
+        app_name = app.get("name") or os.path.splitext(os.path.basename(url.rstrip("/").split("/")[-1]))[0].replace("%20", "_")
+        if app_name.endswith(".git"):
+            app_name = app_name[:-4]
+        print(f"=== Installing custom app: {app_name} from {url} ({branch}) ===")
+        app_dir = f"apps/{app_name}"
+        if not os.path.exists(app_dir):
+            subprocess.run(["git", "clone", "--branch", branch, "--depth", "1", url, app_dir], check=True)
+        req_file = os.path.join(app_dir, "requirements.txt")
+        if os.path.exists(req_file):
+            subprocess.run(["./env/bin/pip", "install", "--no-cache-dir", "-r", req_file], check=True)
+        subprocess.run(["./env/bin/pip", "install", "--no-cache-dir", "-e", app_dir], check=True)
+        apps_txt = "sites/apps.txt"
+        existing = open(apps_txt).read().splitlines() if os.path.exists(apps_txt) else []
+        if app_name not in existing:
+            with open(apps_txt, "a") as f:
+                if open(apps_txt).read() and not open(apps_txt).read().endswith("\n"):
+                    f.write("\n")
+                f.write(f"{app_name}\n")
+        subprocess.run(["bench", "build", "--app", app_name], check=False)
+    subprocess.run("find apps -name .git -exec rm -rf {} +", shell=True)
+    subprocess.run("rm -rf /home/frappe/.cache /home/frappe/.nvm/.cache", shell=True)
+EOF
+
+
+# Re-bake combined frontend assets into container layer
+RUN cp -r /home/frappe/frappe-bench/sites/assets /home/frappe/frappe-bench/assets && \
+    rm -rf /home/frappe/frappe-bench/sites/assets
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD ["/usr/local/bin/start.sh"]

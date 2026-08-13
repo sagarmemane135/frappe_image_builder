@@ -1,0 +1,9 @@
+name: stack-1
+
+services:
+  devcontainer:
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    env_file:
+      - ../.devcontainer/stack-1/.env
